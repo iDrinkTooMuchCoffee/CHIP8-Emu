@@ -89,6 +89,11 @@ int emu()
 			CH8->v[(CH8->opcode & 0xF00) >> 8] = (CH8->opcode & 0x00FF);
 			CH8->pc += 2;
 		break;
+
+		case 0x7000:	// Adds NN to VX
+			CH8->v[(CH8->opcode & 0x0F000) >> 8] += (CH8->opcode & 0x00FF);
+			CH8->pc += 2;
+		break;
 	}
 
 	return 0;
