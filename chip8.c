@@ -54,7 +54,7 @@ void initialize()
 	CH8->opcode = CH8->memory[CH8->pc] << 8 | CH8->memory[CH8->pc + 1];
 }
 
-int emulateCycle()
+void emulateCycle()
 {
 	switch (CH8->opcode & 0xF000)
 	{
