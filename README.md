@@ -1,3 +1,3 @@
 # CHIP8-Emu
 
-My first project in the world of emulation. 
+A CHIP8 interpreter written in C.
