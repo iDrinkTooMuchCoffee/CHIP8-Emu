@@ -7,14 +7,55 @@
 #define SCREEN_WIDTH 640
 #define SCREEN_HEIGHT 320
 
+// Fontset, each num/char is 4 pixels wide and 5 pixels high
+unsigned char chip8_fontset[80] =
+{
+	0xF0, 0x90, 0x90, 0x90, 0xF0, // 0
+	0x20, 0x60, 0x20, 0x20, 0x70, // 1
+	0xF0, 0x10, 0xF0, 0x80, 0xF0, // 2
+	0xF0, 0x10, 0xF0, 0x10, 0xF0, // 3
+	0x90, 0x90, 0xF0, 0x10, 0x10, // 4
+	0xF0, 0x80, 0xF0, 0x10, 0xF0, // 5
+	0xF0, 0x80, 0xF0, 0x90, 0xF0, // 6
+	0xF0, 0x10, 0x20, 0x40, 0x40, // 7
+	0xF0, 0x90, 0xF0, 0x90, 0xF0, // 8
+	0xF0, 0x90, 0xF0, 0x10, 0xF0, // 9 
+	0xF0, 0x90, 0xF0, 0x90, 0x90, // A
+	0xE0, 0x90, 0xE0, 0x90, 0xE0, // B
+	0xF0, 0x80, 0x80, 0x80, 0xF0, // C
+	0xE0, 0x90, 0x90, 0x90, 0xE0, // D
+	0xF0, 0x80, 0xF0, 0x80, 0xF0, // E
+	0xF0, 0x80, 0xF0, 0x80, 0x80  // F
+};
+
+static int keymap[0x10] = {
+	SDLK_0,
+	SDLK_1,
+	SDLK_2,
+	SDLK_3,
+	SDLK_4,
+	SDLK_5,
+	SDLK_6,
+	SDLK_7,
+	SDLK_8,
+	SDLK_9,
+	SDLK_0,
+	SDLK_a,
+	SDLK_b,
+	SDLK_c,
+	SDLK_d,
+	SDLK_e,
+	SDLK_f
+};
+
 typedef struct chip8
 {
 	FILE *game;
 	unsigned short opcode;
-	unsigned char memory[4096];
+	unsigned char memory[memsize];
 	unsigned char V[16];            // 15 8-bit registers
 	unsigned char key[16];
-	//unsigned char display[64 * 32]; // 2048 pixel graphics
+	unsigned char display[64 * 32]; // 2048 pixel graphics
 	unsigned short stack[16];
 	int drawFlag;
 	unsigned short sp;              // Stack pointer
@@ -50,7 +91,6 @@ void setup_graphics()
 
 void setup_input()
 {
-	Uint8 * keys;
 	SDL_Event event;
 	SDL_Init(SDL_INIT_EVERYTHING);
 }
@@ -83,10 +123,9 @@ void chip8_init(C8 *CH8)
 	memset(CH8->V, 0, sizeof(CH8->V));                     // clear registers
 
 	// Load fontset
-	/*
+	
 	for (int i = 0; i < 80; ++i)
 		CH8->memory[i] = chip8_fontset[i];	
-		*/
 }
 
 void chip8_timers(C8 *CH8)
@@ -101,6 +140,12 @@ void chip8_timers(C8 *CH8)
 
 void emulate_cycle(C8 *CH8)
 {
+	Uint8 * keys;
+	unsigned short x;
+	unsigned short y; 
+	unsigned short height; 
+	unsigned short pixel;
+
 	CH8->opcode = CH8->memory[CH8->pc] << 8 | CH8->memory[CH8->pc + 1]; // Merge both bytes for opcode
 
 	switch (CH8->opcode & 0xF000) // Decode opcode
@@ -173,17 +218,17 @@ void emulate_cycle(C8 *CH8)
 					break;
 
 				case 0x0001: // 8XY1: Sets VX to VX or VY
-					CH8->[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] | CH8->V[(CH8->opcode & 0x00F0) >> 4];
+					CH8->V[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] | CH8->V[(CH8->opcode & 0x00F0) >> 4];
 					CH8->pc += 2;
 					break;
 
 				case 0x0002: // 8XY2: Sets VX to VX and VY
-					CH8->[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] & CH8->V[(CH8->opcode & 0x00F0) >> 4];
+					CH8->V[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] & CH8->V[(CH8->opcode & 0x00F0) >> 4];
 					CH8->pc += 2;
 					break;
 
 				case 0x0003: // 8XY3: Sets VX to VX xor VY
-					CH8->[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] ^ CH8->V[(CH8->opcode & 0x00F0) >> 4];
+					CH8->V[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] ^ CH8->V[(CH8->opcode & 0x00F0) >> 4];
 					CH8->pc += 2;
 					break;
 
@@ -207,13 +252,15 @@ void emulate_cycle(C8 *CH8)
 			}
 			break;
 
-		case 0xD000: // DXYN: Responsible for drawing to the display 
+		case 0xD000: // DXYN: Draws a sprite to the display at memory location I at (Vx, Vy). Width = 8 pixels and Height = N pixels
 			// Get the position and height of the sprite
-			unsigned short x = CH8->V[(CH8->opcode & 0x0F00) >> 8]; 
-			unsigned short y = ch8->V[(opcode & 0X00F0) >> 4];
-			unsigned short height = CH8->opcode & 0x000F;      // Pixel value
-			unsigned short pixel;
-			V[0xF] = 0;                                        // Reset register VF
+
+			x = CH8->V[(CH8->opcode & 0x0F00) >> 8]; 
+			y = CH8->V[(CH8->opcode & 0X00F0) >> 4];
+			height = CH8->opcode & 0x000F;      // Pixel value
+			pixel;
+
+			CH8->V[0xF] = 0;                                        // Reset register VF
 			for (int yline = 0; yline < height; yline++)       // loop over each row
 			{
 				pixel = CH8->memory[CH8->i + yline];           // fetch pixel value from memory starting at I
@@ -221,7 +268,7 @@ void emulate_cycle(C8 *CH8)
 				{
 					if ((pixel & (0x80 >> xline)) != 0)        // Check if current evaluated pixel is 1. (0x80 >> xline scan through the byte, one bit at a time)
 					{
-						// Check if the pixel on display is set to 1, if so, register
+						// Check if the pixel on display is set to 1, if so, register -
 						// collision by setting VF register
 						if (CH8->display[(x + xline + ((y + yline) * 64))] == 1)
 							CH8->V[0xF] = 1;
@@ -231,6 +278,26 @@ void emulate_cycle(C8 *CH8)
 			}
 			CH8->drawFlag = 1; 
 			CH8->pc += 2;
+			break;
+
+		case 0xE000:
+			switch(CH8->opcode & 0x000F){
+				case 0x000E: // EX9E: Skips the next instruction if they key stored in Vx is pressed
+					keys = SDL_GetKeyState(NULL);
+					if (keys[keymap[CH9->V[(CH8->opcode & 0x0F00) >> 8]]])
+						CH8->pc += 4;
+					else
+						CH8-> += 2;
+					break;
+
+				case 0x0001: // EXA1: Skips the next instruction if the key stored in VX isn't pressed
+					keys = SDL_GetKeyState(NULL);
+					if (!keys[keymap[CH8->V[(CH8->opcode & 0x0F00) >> 8]]])
+						CH8->pc += 4;
+					else
+						CH8->pc += 2;
+					break;
+			}
 			break;
 
 		default:
