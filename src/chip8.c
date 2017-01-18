@@ -98,7 +98,6 @@ void setup_input()
 void chip8_init(C8 *CH8)
 {
 	char game_name[100];
-	//int i = 0;
 	
 	CH8->i      = 0;     // Reset index register
 	CH8->sp     = 0;     // Reset stack pointer
@@ -123,7 +122,6 @@ void chip8_init(C8 *CH8)
 	memset(CH8->V, 0, sizeof(CH8->V));                     // clear registers
 
 	// Load fontset
-	
 	for (int i = 0; i < 80; ++i)
 		CH8->memory[i] = chip8_fontset[i];	
 }
@@ -146,7 +144,7 @@ void emulate_cycle(C8 *CH8)
 	unsigned short height; 
 	unsigned short pixel;
 
-	CH8->opcode = CH8->memory[CH8->pc] << 8 | CH8->memory[CH8->pc + 1]; // Merge both bytes for opcode
+	CH8->opcode = CH8->memory[CH8->pc] << 8 | CH8->memory[CH8->pc + 1]; // Merge both bytes for opcode to treat it as one number
 
 	switch (CH8->opcode & 0xF000) // Decode opcode
 	{
@@ -162,7 +160,7 @@ void emulate_cycle(C8 *CH8)
 				case 0x000E:                                   // 00EE: RET - Return from a subroutine
 					CH8->sp--;                                 // pop the top of the stack
 					CH8->pc = CH8->stack[CH8->sp];             // Set the pc to the previous stack
-					CH8->pc += 2;                              // Chip-8 commands are 2 bytes
+					CH8->pc += 2;                              // Chip-8 opcodes are 2 bytes long, increment program counter 2B
 					break;
 				default:
 					printf("Wrong opcode: %d\n", CH8->opcode);
@@ -241,26 +239,44 @@ void emulate_cycle(C8 *CH8)
 					CH8->pc += 2;
 					break;
 
-				case 0x005: // 8XY5: Set Vx = Vx - Vy. If VX > VY then VF = 1, otherwise it's 0
+				case 0x0005: // 8XY5: Set Vx = Vx - Vy. If VX > VY then VF = 1, otherwise it's 0
 					if (((int)CH8->V[(CH8->opcode & 0x0F00) >> 8] - (int)CH8->V[(CH8->opcode & 0x00F0) >> 4]) >= 0)
 						CH8->V[0xF] = 1;
 					else
 						CH8->V[0xF] &= 0;
 					CH8->V[(CH8->opcode & 0x0F00) >> 8] -= CH8->V[(CH8->opcode & 0x00F0) >> 4];
 					CH8->pc += 2;
-						
+					break;
+				case 0x0006: // 8XY6: Shifts VX right by one. VF is set to the value of the least significant bit of VX before the shift
+					CH8->V[0xF] = CH8->V[(CH8->opcode & 0x0F00) >> 8] & 7;
+					CH8->V[(CH8->opcode & 0xF00) >> 8] = CH8->V[(CH8->opcode & 0x0F00) >> 8] >> 1;
+					CH8->pc += 2;
+					break;
+
+				case 0x0007: // 8XY7: Sets VX to VY minus VX. VF is set to 0 when there's a borrow, and 1 when there isn't
+                	if(((int)CH8->V[(CH8->opcode & 0x0F00) >> 8] - (int)CH8->V[(CH8->opcode & 0x00F0) >> 4]) > 0)
+                    	CH8->V[0xF] = 1;
+                    else
+                       	CH8->V[0xF] &= 0;
+
+                        CH8->V[(CH8->opcode & 0x0F00) >> 8] = CH8->V[(CH8->opcode & 0x00F0) >> 4] - CH8->V[(CH8->opcode & 0x0F00) >> 8];
+                        CH8->pc += 2;
+                    break;		
+				
+				case 0x000E: // 8XYE: Shifts VX left by one. VF is set to the value of the most significant bit of VX before the shift.
+
 			}
 			break;
 
 		case 0xD000: // DXYN: Draws a sprite to the display at memory location I at (Vx, Vy). Width = 8 pixels and Height = N pixels
+			
 			// Get the position and height of the sprite
-
 			x = CH8->V[(CH8->opcode & 0x0F00) >> 8]; 
-			y = CH8->V[(CH8->opcode & 0X00F0) >> 4];
+			y = CH8->V[(CH8->opcode & 0x00F0) >> 4];
 			height = CH8->opcode & 0x000F;      // Pixel value
 			pixel;
 
-			CH8->V[0xF] = 0;                                        // Reset register VF
+			CH8->V[0xF] = 0;                                   // Reset register VF
 			for (int yline = 0; yline < height; yline++)       // loop over each row
 			{
 				pixel = CH8->memory[CH8->i + yline];           // fetch pixel value from memory starting at I
@@ -281,7 +297,8 @@ void emulate_cycle(C8 *CH8)
 			break;
 
 		case 0xE000:
-			switch(CH8->opcode & 0x000F){
+			switch(CH8->opcode & 0x000F)
+			{
 				case 0x000E: // EX9E: Skips the next instruction if they key stored in Vx is pressed
 					keys = SDL_GetKeyState(NULL);
 					if (keys[keymap[CH9->V[(CH8->opcode & 0x0F00) >> 8]]])
