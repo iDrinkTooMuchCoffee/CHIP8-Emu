@@ -65,18 +65,18 @@ typedef struct chip8
 	unsigned short pc;              // Program counter
 	unsigned char delay_timer;
 	unsigned char sound_timer;
-} C8;
+} CH8;
 
 void chip8_setup();
-void chip8_init(C8 *CH8);
-void chip8_timers(C8 *CH8);
-void chip8_draw(C8 *CH8);
-void emulate_cycle(C8 *CH8);
+void chip8_init(CH8 *CH8);
+void chip8_timers(CH8 *CH8);
+void chip8_draw(CH8 *CH8);
+void emulate_cycle(CH8 *CH8);
 
 
 void chip8_setup()
 {
-	C8 CH8;
+	CH8 CH8;
 
 	chip8_init(&CH8);
 
@@ -98,7 +98,7 @@ void chip8_setup()
 	}
 }
 
-void chip8_init(C8 *CH8)
+void chip8_init(CH8 *CH8)
 {
 	char game_name[100];
 	printf("Enter name of game: ");
@@ -129,7 +129,7 @@ void chip8_init(C8 *CH8)
 	CH8-> opcode = 0x200;
 }
 
-void chip8_timers(C8 *CH8)
+void chip8_timers(CH8 *CH8)
 {
 	if (CH8->delay_timer > 0)
 		CH8->delay_timer--;
@@ -139,7 +139,7 @@ void chip8_timers(C8 *CH8)
 		printf("%c", 7);
 }
 
-void chip8_draw(C8 *CH8)
+void chip8_draw(CH8 *CH8)
 {
 	int i, j;
 
@@ -161,7 +161,7 @@ void chip8_draw(C8 *CH8)
 	SDL_Delay(15);
 }
 
-void emulate_cycle(C8 *CH8)
+void emulate_cycle(CH8 *CH8)
 {
 	Uint8 *keys;
 	unsigned short height; 
@@ -424,7 +424,7 @@ void emulate_cycle(C8 *CH8)
 
 int main(int argc, char **argv)
 {
-	C8 *CH8;
+	CH8 *CH8;
 
 	chip8_setup();
 	
